@@ -9,7 +9,7 @@ var express = require('express')
   , entry = require('./routes/entry')
   , http = require('http')
   , path = require('path')
-  , flash = require('connect-flash');
+  , flash = require('connect-flash')
 
 var app = express();
 
@@ -38,6 +38,10 @@ app.get('/register', entry.register);
 app.get('/forgotlogin', entry.forgotlogin);
 app.get('/:user/home', entry.user);
 app.get('/logout', entry.logout);
+app.post('/verify',entry.verify);
+app.get('/verifyCode',entry.verifyCode);
+app.post('/codeCheck',entry.codeCheck);
+
 
 http.createServer(app).listen(app.get('port'), function(){
   console.log("Express server listening on port " + app.get('port'));

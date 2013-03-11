@@ -1,0 +1,11 @@
+    <% include header %>
+    <h1><%= title %></h1>
+    <div>
+        <h3>Verification Page</h3>
+        <%= message %>
+        <form method="post" action="/codeCheck">
+           Code: <input type="text" name="code"/><br/>
+           <input type="submit" value="Submit"/>
+        </form>
+    </div>
+    <% include footer %>

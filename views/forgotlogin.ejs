@@ -4,9 +4,8 @@
         <h3>Forgot your username or password?</h3>
         <p>Enter your username or email linked to your <%= title %> account. A link will 
         be sent to your email. Use it to reset your password, or be reminded of your username.</p>
-        <form method="get" action="/forgotlogin">
-           Username: <input type="text" name="username"/><br/>
-           or
+        <%= message %>
+        <form method="post" action="/forgotloginProcess">
            E-mail: <input type="text" name="email"/><br/>
            <input type="submit" value="Submit"/>
         </form>

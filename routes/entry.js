@@ -7,15 +7,124 @@ var online = {};
 
 // # User Server-Side Routes
 
-//GET register page
+//GET rsegister page
 exports.register = function(req, res){
-  res.render('register',{title: 'Tweetee'});
+  res.render('register',{title: 'Tweetee', message: req.flash("error")});
 };
 
 //GET forgot login page
 exports.forgotlogin = function(req, res){
-  res.render('forgotlogin',{title: 'Tweetee'});
+  res.render('forgotlogin',{title: 'Tweetee', message: " "});
 };
+
+exports.forgotloginProcess = function(req, res){
+  //
+  var email = req.body.email.length
+  if(email.length > 0){
+    for(var i = 0; i < users.userdb.length; i++){
+        if(users.userdb[i].email = email){
+          var username = users.userdb[i].username;
+          //Send Mail username, email, password reset page
+          
+          break;
+        }
+    }
+    users.userdb
+  }else{
+    req.flash('message',"Please make sure that all of the required  are filled");
+  }
+  res.redirect('forgotlogin',{title: 'Tweetee', message: req.flash("message")});
+};
+
+exports.verifyCode = function(req, res){
+  res.render('verifyCode',{title: 'Tweetee', message: req.flash("message")});
+}
+
+exports.verify = function(req, res){
+  // Part 1: Check to see if the registration is ok
+
+   /*Register Requirements - 
+    *   1. The fields of: Name, Username, E-mail, Password, Retype P are filled (astarisk indicated)
+    *   2. The username is not already taken and no spaces
+    *   3. The email is valid (with @ symbol at least?)
+    *   4. The password is a minimum of 6 characters and the retype matches
+    *   People can reference any location and website
+    * If requirements are not fulfiled then the respective error message is displayed
+    */
+    var name = req.body.name;
+    var username = req.body.username;
+    var email = req.body.email;
+    var password = req.body.password;
+    var retypeP = req.body.retypeP;
+    var location = req.body.location;
+    var website = req.body.website;
+    if(name.length == 0 || username.length == 0 || email.length == 0 || password.length == 0){
+      //If at least one of the necessary parameters do not exist, error posted
+        req.flash('error',"Please make sure that all of the required fields are filled");
+        res.redirect('/register?');
+    }else if(users.checkUsername(username)){
+        //If the username is taken, error. end
+        req.flash('error',"The username is currently taken. Please chose another and try again.");
+        res.redirect('/register?');
+    }else if(users.checkEmail(email)){
+        //Email missing a @?
+        req.flash('error',"The email is invalid. Please try again.");
+        res.redirect('/register?');
+    }else if(users.checkPassword(password, retypeP)){
+        //Password is less than 6 characters and match
+        req.flash('error', "The passwords must match and be at least 6 characters long.");
+        res.redirect('/register?');
+    }else{
+        //Form passed the check, so the registration code is gained
+        //Construct the code
+        var randVarCode = makeCode();
+        var userVerObj = {
+               name: name, username: username,
+               password: password, 
+               email:email, 
+               code:randVarCode, 
+               location:location, 
+               website:website
+        }; //Store the code and url for the user
+        users.emailVerUsers.push(userVerObj);
+        console.log(userVerObj.username + ' ' + userVerObj.code );
+        //Send an email to the person with link and code
+        emailCode(name, username, password, email, randVarCode);
+        users.codeUserList.push(username);
+        req.flash('message', "A code has been sent out to the email provided."
+              +"Submit it to confirm the account and complete the registration.");
+        res.render('verifyCode',{title:"Tweetee", message: req.flash("message"), email:email}); 
+    }
+}
+exports.codeCheck = function(req,res){
+    var b = false;
+    var formCode = req.body.code;
+    for(var i=0;i<users.emailVerUsers.length;i++){
+        if(users.emailVerUsers[i].code == formCode){
+          b = true;
+          var userToVerify = users.emailVerUsers[i];
+          break;
+        }
+    }
+    if(b){
+      //Create the new user
+      users.delFromCodeList();
+      var newUser = {
+        name: userToVerify.name,
+        username: userToVerify.username,
+        password: userToVerify.password,
+        email: userToVerify.email,
+        location: userToVerify.location,
+        website: userToVerify.website,
+      };
+      users.userdb.push(newUser);
+      req.flash('msg', "The code is correct! Login to begin.");
+      res.redirect('/')
+    }else{
+      req.flash('message', "The code is incorrect! Try Again.");
+      res.redirect('verifyCode')
+    }
+}
 
 //Send the following to the client (user's page)
 exports.user = function (req, res) {
@@ -62,6 +171,7 @@ exports.login = function(req, res){
 
   // TDR: redirect if logged in:
   var userid  = req.cookies.userid;
+  console.log("Cookie userid:"+req.cookies.userid);
 
   // TDR: If the user is already logged in - we redirect to the
   // main application view. We must check both that the `userid`
@@ -75,7 +185,8 @@ exports.login = function(req, res){
   else {
     // Render the login view if this is a new login.
     res.render('login', { title   : 'Tweetee',
-                          message : authmessage });//For login username and password
+                          message : authmessage,
+                          msg: req.flash("msg") });//For login username and password
   }
 };
 
@@ -88,7 +199,7 @@ exports.userAuth = function(req, res) {
   // TDR: do the check as described in the `exports.login` function.
   if (userid !== undefined && online[userid] !== undefined) {
     var onlineUser=online[userid] 
-    res.redirect('/'+onlineUser.username+'/home'); ///?
+    res.redirect('/'+onlineUser.username+'/home');
   }
   else {
     // Pull the values from the form.
@@ -134,4 +245,42 @@ exports.logout = function(req, res) {
   }
   res.redirect('/');
 };
+//////////////////////Functions for verification////////////////////
+//Creates a random 10 char code
+function makeCode(){
+    var text = "";
+    var possible = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+    for( var i=0; i < 10; i++ )
+        text += possible.charAt(Math.floor(Math.random() * possible.length));
+    return text;
+};
+
+function emailCode(name, username, password, email, code){
+    var alphamail = require('alphamail');
+
+    var emailService = new alphamail.EmailService("513cedbd564467-24442067");
+
+    var message = {
+       "name": name,
+       "username": username,
+       "code": code,
+       "url": "http:\/\/localhost:3000/verifyCode\/"
+    };
+
+var payload = new alphamail.EmailMessagePayload()
+    .setProjectId(1452) // ID of "Tweetee Registration Code" project
+    .setSender(new alphamail.EmailContact("ysasaki2014@gmail.com", "ysasaki2014@gmail.com"))
+    .setReceiver(new alphamail.EmailContact(email, email))
+    .setBodyObject(message);
+
+emailService.queue(payload, function(error, result){
+    if(error){
+        console.log("Error! " + result + " (" + error + ")");
+    }else{
+        console.log("Mail successfully sent! ID = " + result);
+    }
+});
+
+};
+
 
